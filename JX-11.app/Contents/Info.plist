@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.lupin.jx11</string>
+    <key>CFBundleName</key>
+    <string>JX-11</string>
+    <key>CFBundleExecutable</key>
+    <string>JX-11</string>
+    <key>CFBundleVersion</key>
+    <string>1.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSInputMonitoringUsageDescription</key>
+    <string>需要读取 JX-11 设备的按键输入以实现按键映射。</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>需要模拟键盘操作以将 JX-11 按键映射到系统按键。</string>
+</dict>
+</plist>

@@ -1,0 +1,35 @@
+#!/bin/bash
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+RESOURCES="$DIR/../Resources"
+
+PYTHON=""
+for candidate in \
+    /Users/lupin/.pyenv/versions/3.12.7/bin/python3 \
+    /usr/bin/python3 \
+    python3; do
+    if command -v "$candidate" &>/dev/null 2>&1 || [ -x "$candidate" ]; then
+        PYTHON="$candidate"
+        break
+    fi
+done
+
+if [ -z "$PYTHON" ]; then
+    osascript -e 'display alert "JX-11" message "找不到 Python 3，请先安装 Python 3。"'
+    exit 1
+fi
+
+# 如果 daemon 已在运行，打开按键设置界面
+if pgrep -f "daemon.py" > /dev/null 2>&1; then
+    "$PYTHON" "$RESOURCES/config_ui.py"
+    exit 0
+fi
+
+# 首次引导（依赖安装 + 权限检查 + 登录项注册）
+"$PYTHON" "$RESOURCES/setup.py"
+if [ $? -ne 0 ]; then
+    exit 1
+fi
+
+# 后台启动守护进程
+nohup "$PYTHON" "$RESOURCES/daemon.py" \
+    >> ~/Library/Logs/jx11-daemon.log 2>&1 &
