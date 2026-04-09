@@ -13,6 +13,7 @@ import time
 REQUIRED_PACKAGES = [
     ("hid",    "hidapi"),
     ("Quartz", "pyobjc-framework-Quartz"),
+    ("AppKit", "pyobjc-framework-AppKit"),
 ]
 
 def pip_install(pkg_name):
@@ -40,10 +41,16 @@ def check_accessibility():
 def check_input_monitoring():
     try:
         import hid
-        devs = hid.enumerate(0x05AC, 0x0220)
-        if not devs:
-            return True
-        d = next((x for x in devs if x['usage_page'] == 12), devs[0])
+        needle = "jx-11"
+        devs = hid.enumerate(0, 0)
+        matches = [
+            d for d in devs
+            if needle in (d.get('product_string') or '').lower()
+            or needle in (d.get('manufacturer_string') or '').lower()
+        ]
+        if not matches:
+            return True   # 设备未连接，无法检测，暂时放行
+        d = next((x for x in matches if x.get('usage_page') == 12), matches[0])
         h = hid.device()
         h.open_path(d['path'])
         h.close()

@@ -10,11 +10,13 @@ from tkinter import messagebox
 CONFIG_PATH = os.path.expanduser("~/.config/jx11/config.json")
 
 DEFAULT_CONFIG = {
-    "滚轮上": {"type": "key", "keycode": 126, "modifiers": [], "label": "↑"},
-    "滚轮下": {"type": "key", "keycode": 125, "modifiers": [], "label": "↓"},
-    "向左":  {"type": "key", "keycode": 53,  "modifiers": [], "label": "ESC"},
-    "向右":  {"type": "key", "keycode": 36,  "modifiers": [], "label": "↩"},
-    "确认键": {"type": "double_modifier", "keycode": 58, "flag": "left_option", "label": "⌥⌥"},
+    "滚轮上":        {"type": "key",            "keycode": 126, "modifiers": [],          "label": "↑"},
+    "滚轮下":        {"type": "key",            "keycode": 125, "modifiers": [],          "label": "↓"},
+    "向左":          {"type": "key",            "keycode": 53,  "modifiers": [],          "label": "ESC"},
+    "向左_double":   {"type": "key",            "keycode": 50,  "modifiers": ["command"], "label": "⌘`"},
+    "向右":          {"type": "key",            "keycode": 36,  "modifiers": [],          "label": "↩"},
+    "向右_double":   {"type": "key",            "keycode": 44,  "modifiers": [],          "label": "/"},
+    "确认键":        {"type": "double_modifier","keycode": 58,  "flag": "left_option",    "label": "⌥⌥"},
 }
 
 BUTTON_NAMES = ["滚轮上", "滚轮下", "向左", "向右", "确认键"]
@@ -214,28 +216,39 @@ class ConfigUI:
         frame = tk.Frame(root, padx=20, pady=4)
         frame.pack()
 
-        for col, text in enumerate(["按键", "当前映射", ""]):
+        # 表头：按键 | 点按 | [设置] | 长按 | [设置]
+        for col, text in enumerate(["按键", "单击", "", "双击", ""]):
             tk.Label(frame, text=text, font=("", 11, "bold"),
-                     width=14, anchor="center",
-                     relief="ridge", bg="#e8e8e8",
+                     width=12 if col in (1, 3) else 4,
+                     anchor="center", relief="ridge", bg="#e8e8e8",
                      padx=4, pady=6).grid(
                 row=0, column=col, sticky="nsew", padx=1, pady=1)
 
         for row, btn in enumerate(BUTTON_NAMES, start=1):
             tk.Label(frame, text=btn, font=("", 11, "bold"),
-                     width=14, anchor="center",
+                     width=8, anchor="center",
                      padx=4, pady=8).grid(
                 row=row, column=0, padx=1, pady=1)
 
-            action = self.cfg.get(btn)
-            lbl = tk.Label(frame, text=action_label(action),
-                           font=("", 12), width=14, anchor="center")
-            lbl.grid(row=row, column=1, padx=1, pady=1)
-            self._cells[btn] = lbl
-
+            # 点按列
+            tap_lbl = tk.Label(frame, text=action_label(self.cfg.get(btn)),
+                               font=("", 12), width=12, anchor="center")
+            tap_lbl.grid(row=row, column=1, padx=1, pady=1)
+            self._cells[btn] = tap_lbl
             tk.Button(frame, text="设置", font=("", 10),
-                      command=lambda b=btn: self._set(b)
+                      command=lambda b=btn: self._set(b, long=False)
                       ).grid(row=row, column=2, padx=4, pady=1)
+
+            # 长按列
+            long_key = btn + '_double'
+            long_lbl = tk.Label(frame, text=action_label(self.cfg.get(long_key)),
+                                font=("", 12), width=12, anchor="center",
+                                fg="#555555")
+            long_lbl.grid(row=row, column=3, padx=1, pady=1)
+            self._cells[long_key] = long_lbl
+            tk.Button(frame, text="设置", font=("", 10),
+                      command=lambda b=btn: self._set(b, long=True)
+                      ).grid(row=row, column=4, padx=4, pady=1)
 
         footer = tk.Frame(root, pady=10)
         footer.pack()
@@ -251,13 +264,14 @@ class ConfigUI:
         h  = root.winfo_height()
         root.geometry(f"+{(sw - w) // 2}+{(sh - h) // 2}")
 
-    def _set(self, btn):
+    def _set(self, btn, long=False):
         r = capture_key(self.root)
         if r is False:
             return
-        self.cfg[btn] = r
+        key = btn + '_double' if long else btn
+        self.cfg[key] = r
         save_config(self.cfg)
-        self._cells[btn].config(text=action_label(r))
+        self._cells[key].config(text=action_label(r))
 
     def _reset(self):
         if messagebox.askyesno("恢复默认", "将所有按键映射恢复为默认设置？"):
@@ -265,6 +279,9 @@ class ConfigUI:
             save_config(self.cfg)
             for btn in BUTTON_NAMES:
                 self._cells[btn].config(text=action_label(self.cfg.get(btn)))
+                long_key = btn + '_double'
+                if long_key in self._cells:
+                    self._cells[long_key].config(text=action_label(self.cfg.get(long_key)))
 
     def run(self):
         self.root.mainloop()

@@ -5,11 +5,9 @@ import Quartz
 LOG         = os.path.expanduser("~/Library/Logs/jx11-daemon.log")
 CONFIG_PATH = os.path.expanduser("~/.config/jx11/config.json")
 
-VENDOR_ID  = 0x05AC
-PRODUCT_ID = 0x0220
+DEVICE_NAME = "JX-11"   # 蓝牙设备名称（大小写不敏感，支持部分匹配）
 
-DOUBLE_CLICK_WINDOW  = 0.30
-LONG_PRESS_THRESHOLD = 0.50
+DOUBLE_CLICK_WINDOW = 0.35   # 秒：两次按下之间的最大间隔
 
 BUTTONS = {
     (0xF4, 0xE1, 0x15): "滚轮上",
@@ -20,11 +18,13 @@ BUTTONS = {
 }
 
 DEFAULT_CONFIG = {
-    "滚轮上": {"type": "key", "keycode": 126, "modifiers": [], "label": "↑"},
-    "滚轮下": {"type": "key", "keycode": 125, "modifiers": [], "label": "↓"},
-    "向左":  {"type": "key", "keycode": 53,  "modifiers": [], "label": "ESC"},
-    "向右":  {"type": "key", "keycode": 36,  "modifiers": [], "label": "↩"},
-    "确认键": {"type": "double_modifier", "keycode": 58, "flag": "left_option", "label": "⌥⌥"},
+    "滚轮上":        {"type": "key",            "keycode": 126, "modifiers": [],          "label": "↑"},
+    "滚轮下":        {"type": "key",            "keycode": 125, "modifiers": [],          "label": "↓"},
+    "向左":          {"type": "key",            "keycode": 53,  "modifiers": [],          "label": "ESC"},
+    "向左_double":   {"type": "key",            "keycode": 50,  "modifiers": ["command"], "label": "⌘`"},
+    "向右":          {"type": "key",            "keycode": 36,  "modifiers": [],          "label": "↩"},
+    "向右_double":   {"type": "key",            "keycode": 44,  "modifiers": [],          "label": "/"},
+    "确认键":        {"type": "double_modifier","keycode": 58,  "flag": "left_option",    "label": "⌥⌥"},
 }
 
 def log(msg):
@@ -109,55 +109,39 @@ def _cycle_windows():
         log(f"轮换窗口失败: {e}")
 
 # ── 按键处理 ──────────────────────────────────────────────
-DOUBLE_CLICK_WINDOW  = 0.55   # 秒：松开后等待第二次按压的窗口
-LONG_PRESS_THRESHOLD = 0.50   # 秒：按住超过此时长视为长按
-
-_pending          = {}   # name -> Timer
-_press_time       = {}   # name -> press timestamp
-_suppress_release = set()  # 双击后抑制第二次松开触发单击
+_pending          = {}    # name -> Timer（等待双击判定）
+_suppress_release = set() # 双击触发后抑制第二次松开的单击
 _last_press       = [None]
 
 def on_press(name):
-    _press_time[name] = time.time()
     cfg    = load_config()
-    action = cfg.get(name)
     double = cfg.get(name + '_double')
+    if name in _pending:
+        # 第二次按下，取消单击定时器，触发双击
+        _pending.pop(name).cancel()
+        _suppress_release.add(name)
+        log(f"触发: {name} 双击 → {double.get('label', '?')}")
+        execute_action(double)
+        return
 
     if not double:
+        # 无双击配置：立即响应
+        action = cfg.get(name)
         if action:
             log(f"触发: {name} → {action.get('label', '?')}")
             execute_action(action)
-        return
-
-    if name in _pending:
-        _pending.pop(name).cancel()
-        _suppress_release.add(name)   # 抑制第二次松开
-        log(f"触发: {name} 双击 → {double.get('label', '?')}")
-        execute_action(double)
-    else:
-        pass  # 等待第二次按下
 
 def on_release(name):
-    # 双击后第二次松开：忽略
     if name in _suppress_release:
         _suppress_release.discard(name)
         return
 
     cfg    = load_config()
-    action = cfg.get(name)
     double = cfg.get(name + '_double')
-    long   = cfg.get(name + '_long')
+    if not double:
+        return  # 无双击配置，已在 on_press 处理
 
-    # 长按检测（优先于双击）
-    if long and name not in _pending:
-        held = time.time() - _press_time.get(name, time.time())
-        if held >= LONG_PRESS_THRESHOLD:
-            log(f"触发: {name} 长按 → {long.get('label', '?')}")
-            execute_action(long)
-            return
-
-    if not double or name in _pending:
-        return
+    action = cfg.get(name)
 
     def fire_single():
         _pending.pop(name, None)
@@ -173,12 +157,26 @@ def on_release(name):
 signal.signal(signal.SIGHUP, lambda *_: log("收到 SIGHUP"))
 
 # ── 设备连接 ──────────────────────────────────────────────
+def _find_device_info():
+    """枚举所有 HID 设备，按名称找到目标设备，优先 usage_page == 12 的接口。"""
+    needle = DEVICE_NAME.lower()
+    devs = hid.enumerate(0, 0)
+    matches = [
+        d for d in devs
+        if needle in (d.get('product_string') or '').lower()
+        or needle in (d.get('manufacturer_string') or '').lower()
+    ]
+    if not matches:
+        return None
+    return next((d for d in matches if d.get('usage_page') == 12), matches[0])
+
 def connect():
     try:
-        devs = hid.enumerate(VENDOR_ID, PRODUCT_ID)
-        if not devs:
+        d = _find_device_info()
+        if not d:
             return None
-        d = next((x for x in devs if x['usage_page'] == 12), devs[0])
+        log(f"找到设备: {d.get('product_string')} "
+            f"(VID={d.get('vendor_id', 0):#06x} PID={d.get('product_id', 0):#06x})")
         h = hid.device()
         h.open_path(d['path'])
         h.set_nonblocking(True)
@@ -186,55 +184,56 @@ def connect():
     except Exception:
         return None
 
-log("守护进程启动")
-h = None
-retry = 0
-while not h:
-    h = connect()
-    if not h:
-        retry += 1
-        if retry % 20 == 0:
-            log(f"等待 JX-11 连接中...（已重试 {retry} 次）")
-        if retry >= 200:
-            log("超时：200次重试后仍未找到 JX-11，退出")
-            sys.exit(1)
-        time.sleep(3)
+if __name__ == '__main__':
+    log("守护进程启动")
+    h = None
+    retry = 0
+    while not h:
+        h = connect()
+        if not h:
+            retry += 1
+            if retry % 20 == 0:
+                log(f"等待 JX-11 连接中...（已重试 {retry} 次）")
+            if retry >= 200:
+                log("超时：200次重试后仍未找到 JX-11，退出")
+                sys.exit(1)
+            time.sleep(3)
 
-prev_btn = 0x00
-log("JX-11 已连接")
+    prev_btn = 0x00
+    log("JX-11 已连接")
 
-try:
-    while True:
-        try:
-            data = h.read(64)
-        except Exception:
-            log("设备断开，等待重连...")
-            h = None
-            while not h:
-                time.sleep(2)
-                h = connect()
-            log("已重连")
-            prev_btn = 0x00
-            continue
+    try:
+        while True:
+            try:
+                data = h.read(64)
+            except Exception:
+                log("设备断开，等待重连...")
+                h = None
+                while not h:
+                    time.sleep(2)
+                    h = connect()
+                log("已重连")
+                prev_btn = 0x00
+                continue
 
-        if data and len(data) >= 5:
-            btn         = data[1]
-            fingerprint = (data[2], data[3], data[4])
-            name        = BUTTONS.get(fingerprint)
+            if data and len(data) >= 5:
+                btn         = data[1]
+                fingerprint = (data[2], data[3], data[4])
+                name        = BUTTONS.get(fingerprint)
 
-            if btn == 0x07 and prev_btn != 0x07:
-                if name:
-                    _last_press[0] = name
-                    on_press(name)
-            elif btn != 0x07 and prev_btn == 0x07:
-                if _last_press[0]:
-                    on_release(_last_press[0])
-                    _last_press[0] = None
+                if btn == 0x07 and prev_btn != 0x07:
+                    if name:
+                        _last_press[0] = name
+                        on_press(name)
+                elif btn == 0x00 and prev_btn != 0x00:
+                    if _last_press[0]:
+                        on_release(_last_press[0])
+                        _last_press[0] = None
 
-            prev_btn = btn
+                prev_btn = btn
 
-        time.sleep(0.001)
+            time.sleep(0.001)
 
-except Exception as e:
-    log(f"异常退出: {e}")
-    sys.exit(1)
+    except Exception as e:
+        log(f"异常退出: {e}")
+        sys.exit(1)

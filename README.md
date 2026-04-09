@@ -149,6 +149,40 @@ JX-11 通过 BLE 模拟为 HID 设备接入 macOS。守护进程使用 `hidapi` 
 
 ---
 
+## 开发者指南
+
+### 迭代修改
+
+直接编辑 `JX-11.app/Contents/Resources/` 下的 Python 文件，改完后重启守护进程生效：
+
+```bash
+# 重启守护进程
+pkill -f daemon.py && open JX-11.app
+
+# 实时查看日志
+tail -f ~/Library/Logs/jx11-daemon.log
+
+# 确认进程状态
+pgrep -f daemon.py
+```
+
+> 配置文件（`~/.config/jx11/config.json`）改动**无需重启**，下次按键时自动读取。
+
+### 运行测试
+
+```bash
+pip install pytest
+pytest tests/
+```
+
+### 安装开发依赖
+
+```bash
+pip install --break-system-packages -r requirements.txt
+```
+
+---
+
 ## License
 
 MIT
