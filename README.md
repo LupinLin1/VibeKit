@@ -89,7 +89,8 @@ VibeKit 的设计理念就是让这个"导航"动作尽可能轻量。
 双击 `JX-11.app`（守护进程运行时）打开配置界面，可为每个按键设置：
 
 - **普通按键**：任意键码 + 修饰键组合（⌘ ⌃ ⌥ ⇧）
-- **双修饰键**：连续发送两次修饰键（如 ⌥⌥ 触发 Raycast）
+- **双修饰键**：连续发送两次修饰键（如 ⌥⌥ 触发 Raycast）— 兼容旧配置
+- **切换输入法**：通过 TIS API 直接循环切换输入法
 - **轮换窗口**：按字母顺序依次激活所有前台应用
 
 配置实时生效，无需重启守护进程。配置保存在 `~/.config/jx11/config.json`。
@@ -108,7 +109,8 @@ JX-11.app/
 │   └── Resources/
 │       ├── daemon.py       # 守护进程主体
 │       ├── config_ui.py    # 配置界面（tkinter）
-│       └── setup.py        # 首次引导安装
+│       ├── setup.py        # 首次引导安装
+│       └── switch_input_method.swift  # 输入法切换（TIS API）
 ```
 
 ### 设备通信
@@ -127,7 +129,7 @@ JX-11 通过 BLE 模拟为 HID 设备接入 macOS。守护进程使用 `hidapi` 
 ### 键盘模拟
 
 - 普通按键：通过 `osascript` 调用 System Events 的 `key code` 指令
-- 双修饰键（⌥⌥）：通过 Quartz `CGEventPost` 直接注入底层 HID 事件，保证与 Raycast 等工具的兼容性
+- 输入法切换：通过 Swift 调用 Carbon TIS（Text Input Source）API 直接切换输入源，比模拟按键更可靠
 
 ### 日志
 

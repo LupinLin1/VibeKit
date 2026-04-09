@@ -216,7 +216,7 @@ class ConfigUI:
         frame = tk.Frame(root, padx=20, pady=4)
         frame.pack()
 
-        # 表头：按键 | 点按 | [设置] | 长按 | [设置]
+        # 表头：按键 | 单击 | [设置] | 双击 | [设置]
         for col, text in enumerate(["按键", "单击", "", "双击", ""]):
             tk.Label(frame, text=text, font=("", 11, "bold"),
                      width=12 if col in (1, 3) else 4,
@@ -239,7 +239,7 @@ class ConfigUI:
                       command=lambda b=btn: self._set(b, long=False)
                       ).grid(row=row, column=2, padx=4, pady=1)
 
-            # 长按列
+            # 双击列
             long_key = btn + '_double'
             long_lbl = tk.Label(frame, text=action_label(self.cfg.get(long_key)),
                                 font=("", 12), width=12, anchor="center",

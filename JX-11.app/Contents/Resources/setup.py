@@ -127,7 +127,7 @@ needs_guide = (
 if needs_guide:
     root = tk.Tk()
     root.title("JX-11 权限设置")
-    root.geometry("420x280")
+    root.geometry("460x320")
     root.resizable(False, False)
     root.eval('tk::PlaceWindow . center')
 
@@ -137,44 +137,51 @@ if needs_guide:
 
     f1 = tk.Frame(root)
     f1.pack(fill='x', padx=24, pady=4)
-    acc_icon = tk.Label(f1, text="●", fg="orange", width=2)
+    acc_icon = tk.Label(f1, text="●", fg="orange", width=2, font=("", 14))
     acc_icon.pack(side='left')
-    tk.Label(f1, text="辅助功能（用于模拟键盘）", anchor='w').pack(side='left', expand=True, fill='x')
+    acc_info = tk.Frame(f1)
+    acc_info.pack(side='left', expand=True, fill='x')
+    tk.Label(acc_info, text="辅助功能（用于模拟键盘）", anchor='w').pack(side='top')
+    tk.Label(acc_info, text="  让 JX-11 能发送按键到其他应用", anchor='w',
+             fg="#888888", font=("", 9)).pack(side='top')
     acc_btn = tk.Button(f1, text="去开启 →",
         command=open_accessibility_prefs)
     acc_btn.pack(side='right')
 
     f2 = tk.Frame(root)
     f2.pack(fill='x', padx=24, pady=4)
-    inp_icon = tk.Label(f2, text="●", fg="orange", width=2)
+    inp_icon = tk.Label(f2, text="●", fg="orange", width=2, font=("", 14))
     inp_icon.pack(side='left')
-    tk.Label(f2, text="输入监控（用于读取 JX-11 设备）", anchor='w').pack(side='left', expand=True, fill='x')
+    inp_info = tk.Frame(f2)
+    inp_info.pack(side='left', expand=True, fill='x')
+    tk.Label(inp_info, text="输入监控（用于读取 JX-11 设备）", anchor='w').pack(side='top')
+    tk.Label(inp_info, text="  让 JX-11 能接收蓝牙遥控器按键", anchor='w',
+             fg="#888888", font=("", 9)).pack(side='top')
     inp_btn = tk.Button(f2, text="去开启 →",
         command=open_input_monitoring_prefs)
     inp_btn.pack(side='right')
 
     tk.Label(root,
-        text="开启权限后点击「完成」",
+        text="开启权限后「继续」按钮将自动激活",
         fg="gray", pady=12).pack()
 
-    def on_done():
+    continue_btn = tk.Button(root, text="继续", width=12,
+        state="disabled", command=root.destroy)
+    continue_btn.pack(pady=8)
+
+    def poll_permissions():
         acc_ok = check_accessibility()
         inp_ok = check_input_monitoring()
-        acc_icon.config(fg="green" if acc_ok else "orange")
-        inp_icon.config(fg="green" if inp_ok else "orange")
+        acc_icon.config(text="✓" if acc_ok else "●",
+                        fg="green" if acc_ok else "orange")
+        inp_icon.config(text="✓" if inp_ok else "●",
+                        fg="green" if inp_ok else "orange")
         if acc_ok and inp_ok:
-            root.destroy()
+            continue_btn.config(state="normal")
         else:
-            missing_list = []
-            if not acc_ok: missing_list.append("辅助功能")
-            if not inp_ok: missing_list.append("输入监控")
-            tk.messagebox.showwarning(
-                "权限未完成",
-                f"请先开启：{', '.join(missing_list)}")
+            root.after(1500, poll_permissions)
 
-    import tkinter.messagebox
-    tk.Button(root, text="完成", width=12,
-        command=on_done).pack(pady=8)
+    root.after(1500, poll_permissions)
 
     root.mainloop()
 

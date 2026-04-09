@@ -1,5 +1,7 @@
-.DS_Store
 __pycache__/
 *.pyc
 *.pyo
+.DS_Store
+*.log
 .gstack/
+switch_input_method
